@@ -1,7 +1,49 @@
+import pandas as pd
 import sys
 import random
 import pygame
+import os
 from beautifultable import BeautifulTable
+from datetime import date
+from PIL import Image
+
+
+def get_plots(ev):
+    dens_arr = get_sim_dens(ev)
+    df_dens = pd.DataFrame({"Density": dens_arr})
+    df_dens.to_csv("./data/density.csv", index=True)
+    os.system("Rscript graph_ECA.R")
+
+
+def screenshot():
+    os.system(
+        f"flameshot full --path ./screenshots/rule:{rule}_n:{n}_{date.today()}.png"
+    )
+
+
+def save_state(ev):
+
+    with open(f"./saved_states/rule:{rule}_n:{n}_{date.today()}.txt", "w") as f:
+        f.write(ev)
+
+
+def get_sim_dens(ev):
+    dens = []
+    dens.append(density(int(ev, 2)))
+
+    for i in range(1, n):
+        ev = Compute(ev, i, flag=False)
+        dens.append(density(int(ev, 2)))
+
+    return dens
+
+
+def density(s: int) -> int:
+    d = 0
+    while s:
+        d += s & 1
+        s = s >> 1
+    return d
 
 
 def get_bins(n):
@@ -18,13 +60,14 @@ def fun(x: int) -> bool:
     return rule & 1 << x
 
 
-def Compute(eval_str, y) -> str:
+def Compute(eval_str, y, flag) -> str:
     new = ""
     for i, _ in enumerate(eval_str):
         if i == 0:
             if fun(int(eval_str[-1]) << 2 | int(eval_str[0]) << 1 | int(eval_str[1])):
                 new += "1"
-                DrawCell(i, y)
+                if flag:
+                    DrawCell(i, y)
             else:
                 new += "0"
         elif i == n - 1:
@@ -32,7 +75,8 @@ def Compute(eval_str, y) -> str:
                 int(eval_str[i - 1]) << 2 | int(eval_str[i]) << 1 | int(eval_str[0])
             ):
                 new += "1"
-                DrawCell(i, y)
+                if flag:
+                    DrawCell(i, y)
             else:
                 new += "0"
         else:
@@ -40,7 +84,8 @@ def Compute(eval_str, y) -> str:
                 int(eval_str[i - 1]) << 2 | int(eval_str[i]) << 1 | int(eval_str[i + 1])
             ):
                 new += "1"
-                DrawCell(i, y)
+                if flag:
+                    DrawCell(i, y)
             else:
                 new += "0"
     return new
@@ -66,7 +111,6 @@ def RandStr() -> str:
     s = ""
     for i in range(n):
         s += str(random.choice([0, 1]))
-    # print(s)
     return s
 
 
@@ -115,6 +159,13 @@ def main():
         sys.exit()
     else:
         print(banner)
+        print("\n\n\n\n”")
+        print("*" * 100)
+        print("**   Press <g> for the plots of the simulation ")
+        print("**   Press <s> for take a screenshot ")
+        print("**   Press <a> for save the state ")
+        print("*" * 100)
+        print("\n\n\n\n”")
 
         if ".txt" in sys.argv[1]:
             file = sys.argv[1]
@@ -138,24 +189,26 @@ def main():
             colorCell = colors[input("Select color cell: ")]
             evalStr = RandStr()
 
-        # print(evalStr)
+        print(evalStr)
 
+        evOg = evalStr
         pygame.init()
         infoObject = pygame.display.Info()
         window = (infoObject.current_w, infoObject.current_h)
         windowSurface = (n * cellSize, n * cellSize)
         screen = pygame.display.set_mode(window, pygame.NOFRAME)
-        # screen.fill(colorBackground)
 
         background = pygame.Surface(windowSurface)
         background.fill(colorBackground)
+
+        screen.fill(colorBackground)
 
         for i, v in enumerate(evalStr):
             if v == "1":
                 DrawCell(i, 0)
 
         for i in range(1, n):
-            evalStr = Compute(evalStr, i)
+            evalStr = Compute(evalStr, i, flag=True)
 
         backgroundOg = background
         screen.blit(background, (0, 0))
@@ -194,6 +247,17 @@ def main():
                     screen.fill(colorBackground)
                     screen.blit(bk1, (horz, vert))
                     pygame.display.flip()
+                if event.key == pygame.K_g:
+                    get_plots(evOg)
+                    running = False
+                    img = Image.open("./img/density.png")
+                    img.show()
+                if event.key == pygame.K_s:
+                    screenshot()
+                    running = False
+                if event.key == pygame.K_a:
+                    save_state(evOg)
+                    running = False
 
     pygame.quit()
 
